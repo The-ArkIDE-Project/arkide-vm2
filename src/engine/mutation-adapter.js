@@ -20,7 +20,7 @@ const mutatorTagToObject = function (dom) {
             delete obj.blockinfo;
         }
     }
-    for (let i = 0; i < dom.children.length; i++) {
+    for (let i = 0; i < (dom.children ?? []).length; i++) {
         obj.children.push(
             mutatorTagToObject(dom.children[i])
         );
