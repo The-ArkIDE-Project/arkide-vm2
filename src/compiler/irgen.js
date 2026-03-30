@@ -146,66 +146,40 @@ class ScriptTreeGenerator {
         return blockInfo;
     }
 
-    createConstantInput (constant, preserveStrings = false) {
-        if (constant === null) throw new Error('IR: Constant cannot have a null value.');
-
-        constant += '';
-        const numConstant = +constant;
-        const preserve = preserveStrings && this.namesOfCostumesAndSounds.has(constant);
-
-        if (!Number.isNaN(numConstant) && (constant.trim() !== '' || constant.includes('\t'))) {
-            if (!preserve && numConstant.toString() === constant) {
-                return new IntermediateInput(InputOpcode.CONSTANT, IntermediateInput.getNumberInputType(numConstant), {value: numConstant});
-            }
-            return new IntermediateInput(InputOpcode.CONSTANT, InputType.STRING_NUM, {value: constant});
-        }
-
-        if (!preserve) {
-            if (constant === 'true') {
-                return new IntermediateInput(InputOpcode.CONSTANT, InputType.STRING_BOOLEAN, {value: constant});
-            } else if (constant === 'false') {
-                return new IntermediateInput(InputOpcode.CONSTANT, InputType.STRING_BOOLEAN, {value: constant});
-            }
-        }
-
-        return new IntermediateInput(InputOpcode.CONSTANT, InputType.STRING_NAN, {value: constant});
-    }
-
     /**
      * Descend into a child input of a block. (eg. the input STRING of "length of ( )")
      * @param {*} parentBlock The parent Scratch block that contains the input.
      * @param {string} inputName The name of the input to descend into.
      * @private
-     * @returns {IntermediateInput} Compiled input node for this input.
+     * @returns {Node} Compiled input node for this input.
      */
-     */
+    descendInputOfBlock (parentBlock, inputName) {
         const input = parentBlock.inputs[inputName];
-        if (!input) {
         if (!input) {
             // log.warn(`IR: ${parentBlock.opcode}: missing input ${inputName}`, parentBlock);
             return {
                 kind: 'constant',
                 value: null
+            };
         }
         const inputId = input.block;
         const block = this.getBlockById(inputId);
         if (!block) {
             log.warn(`IR: ${parentBlock.opcode}: could not find input ${inputName} with ID ${inputId}`);
-            log.warn(`IR: ${parentBlock.opcode}: could not find input ${inputName} with ID ${inputId}`);
             return {
                 kind: 'constant',
                 value: null
+            };
         }
 
-
+        return this.descendInput(block);
     }
 
     /**
      * Descend into an input. (eg. "length of ( )")
      * @param {*} block The parent Scratch block input.
-     * @param {boolean} preserveStrings Should this input keep the names of costumes and sounds at strings.
      * @private
-     * @private
+     * @returns {Node} Compiled input node for this input.
      */
     descendInput (block) {
         // check if we have extension ir for this opcode
@@ -230,10 +204,8 @@ class ScriptTreeGenerator {
                 }
             }
         }
-    }
 
         switch (block.opcode) {
-        case 'colour_picker':
         case 'colour_picker':
             return {
                 kind: 'constant',
@@ -244,11 +216,10 @@ class ScriptTreeGenerator {
         case 'math_number':
         case 'math_positive_number':
         case 'math_whole_number':
-        case 'math_whole_number':
             return {
                 kind: 'constant',
                 value: block.fields.NUM.value
-        case 'text':
+            };
         case 'text':
             return {
                 kind: 'constant',
@@ -274,6 +245,7 @@ class ScriptTreeGenerator {
                 kind: 'math.polygon',
                 points
             };
+
         case 'argument_reporter_string_number': {
             const name = block.fields.VALUE.value;
             // lastIndexOf because multiple parameters with the same name will use the value of the last definition
@@ -281,27 +253,26 @@ class ScriptTreeGenerator {
             if (index === -1) {
                 // Legacy support
                 if (name.toLowerCase() === 'last key pressed') {
-                if (name.toLowerCase() === 'last key pressed') {
                     return {
                         kind: 'tw.lastKeyPressed'
+                    };
                 }
             }
-            if (index === -1) {
             if (index === -1) {
                 return {
                     kind: 'constant',
                     value: 0
-            }
+                };
             }
             return {
                 kind: 'args.stringNumber',
                 index: index
+            };
         }
         case 'argument_reporter_boolean': {
             // see argument_reporter_string_number above
             const name = block.fields.VALUE.value;
             const index = this.script.arguments.lastIndexOf(name);
-            if (index === -1) {
             if (index === -1) {
                 const nameCheck = name.toLowerCase();
                 const bool = nameCheck === 'is compiled?' || nameCheck === 'is ArkIDE?' ||
@@ -329,28 +300,28 @@ class ScriptTreeGenerator {
         case 'control_is_clone':
             return {
                 kind: 'control.isclone'
+            };
 
         case 'data_variable':
-        case 'data_variable':
             return {
+                kind: 'var.get',
                 variable: this.descendVariable(block, 'VARIABLE', SCALAR_TYPE)
-                variable: this.descendVariable(block, 'VARIABLE', SCALAR_TYPE)
-        case 'data_itemoflist':
+            };
         case 'data_itemoflist':
             return {
+                kind: 'list.get',
                 list: this.descendVariable(block, 'LIST', LIST_TYPE),
                 index: this.descendInputOfBlock(block, 'INDEX')
-                index: this.descendInputOfBlock(block, 'INDEX')
-        case 'data_lengthoflist':
+            };
         case 'data_lengthoflist':
             return {
+                kind: 'list.length',
                 list: this.descendVariable(block, 'LIST', LIST_TYPE)
-                list: this.descendVariable(block, 'LIST', LIST_TYPE)
-        case 'data_listcontainsitem':
+            };
         case 'data_listcontainsitem':
             return {
+                kind: 'list.contains',
                 list: this.descendVariable(block, 'LIST', LIST_TYPE),
-                item: this.descendInputOfBlock(block, 'ITEM')
                 item: this.descendInputOfBlock(block, 'ITEM')
             };
             case 'data_itemnumoflist':
@@ -364,10 +335,10 @@ class ScriptTreeGenerator {
                     kind: 'list.amountOf',
                     list: this.descendVariable(block, 'LIST', LIST_TYPE),
                     value: this.descendInputOfBlock(block, 'VALUE')
-        case 'data_listcontents':
+                };
         case 'data_listcontents':
             return {
-                list: this.descendVariable(block, 'LIST', LIST_TYPE)
+                kind: 'list.contents',
                 list: this.descendVariable(block, 'LIST', LIST_TYPE)
             };
         case 'data_filterlistitem':
@@ -377,12 +348,12 @@ class ScriptTreeGenerator {
         case 'data_filterlistindex':
             return {
                 kind: 'list.filterindex'
+            };
 
         case 'event_broadcast_menu': {
             const broadcastOption = block.fields.BROADCAST_OPTION;
             const broadcastVariable = this.target.lookupBroadcastMsg(broadcastOption.id, broadcastOption.value);
             // TODO: empty string probably isn't the correct fallback
-            const broadcastName = broadcastVariable ? broadcastVariable.name : '';
             const broadcastName = broadcastVariable ? broadcastVariable.name : '';
             return {
                 kind: 'constant',
@@ -408,25 +379,25 @@ class ScriptTreeGenerator {
             return {
                 kind: 'control.inlineStackOutput',
                 code: this.descendSubstack(block, 'SUBSTACK')
+            };
         case 'looks_backdropnumbername':
-            if (block.fields.NUMBER_NAME.value === 'number') {
             if (block.fields.NUMBER_NAME.value === 'number') {
                 return {
                     kind: 'looks.backdropNumber'
-            }
+                };
             }
             return {
                 kind: 'looks.backdropName'
+            };
         case 'looks_costumenumbername':
-            if (block.fields.NUMBER_NAME.value === 'number') {
             if (block.fields.NUMBER_NAME.value === 'number') {
                 return {
                     kind: 'looks.costumeNumber'
-            }
+                };
             }
             return {
                 kind: 'looks.costumeName'
-        case 'looks_size':
+            };
         case 'looks_size':
             return {
                 kind: 'looks.size'
@@ -434,38 +405,38 @@ class ScriptTreeGenerator {
         case 'looks_tintColor':
             return {
                 kind: 'looks.tintColor'
-        case 'motion_direction':
+            };
         case 'motion_direction':
             return {
                 kind: 'motion.direction'
-        case 'motion_xposition':
+            };
         case 'motion_xposition':
             return {
                 kind: 'motion.x'
-        case 'motion_yposition':
+            };
         case 'motion_yposition':
             return {
                 kind: 'motion.y'
+            };
 
-        case 'operator_add':
         case 'operator_add':
             return {
                 kind: 'op.add',
                 left: this.descendInputOfBlock(block, 'NUM1'),
                 right: this.descendInputOfBlock(block, 'NUM2')
-        case 'operator_and':
+            };
         case 'operator_and':
             return {
                 kind: 'op.and',
                 left: this.descendInputOfBlock(block, 'OPERAND1'),
                 right: this.descendInputOfBlock(block, 'OPERAND2')
-        case 'operator_contains':
+            };
         case 'operator_contains':
             return {
                 kind: 'op.contains',
                 string: this.descendInputOfBlock(block, 'STRING1'),
                 contains: this.descendInputOfBlock(block, 'STRING2')
-        case 'operator_divide':
+            };
         case 'operator_divide':
             return {
                 kind: 'op.divide',
@@ -494,19 +465,19 @@ class ScriptTreeGenerator {
                 kind: 'op.expandmath',
                 operations
             };
-        case 'operator_equals':
+        }
         case 'operator_equals':
             return {
+                kind: 'op.equals',
                 left: this.descendInputOfBlock(block, 'OPERAND1'),
                 right: this.descendInputOfBlock(block, 'OPERAND2')
-                right: this.descendInputOfBlock(block, 'OPERAND2')
-        case 'operator_gt':
+            };
         case 'operator_gt':
             return {
+                kind: 'op.greater',
                 left: this.descendInputOfBlock(block, 'OPERAND1'),
                 right: this.descendInputOfBlock(block, 'OPERAND2')
-                right: this.descendInputOfBlock(block, 'OPERAND2')
-        case 'operator_join':
+            };
         case 'operator_join':
             return {
                 kind: 'op.join',
@@ -526,27 +497,27 @@ class ScriptTreeGenerator {
                 kind: "op.expandjoin",
                 strings
             };
-        case 'operator_length':
+        }
         case 'operator_length':
             return {
                 kind: 'op.length',
                 string: this.descendInputOfBlock(block, 'STRING')
-        case 'operator_letter_of':
+            };
         case 'operator_letter_of':
             return {
                 kind: 'op.letterOf',
                 letter: this.descendInputOfBlock(block, 'LETTER'),
                 string: this.descendInputOfBlock(block, 'STRING')
-        case 'operator_lt':
+            };
         case 'operator_lt':
             return {
+                kind: 'op.less',
                 left: this.descendInputOfBlock(block, 'OPERAND1'),
                 right: this.descendInputOfBlock(block, 'OPERAND2')
-                right: this.descendInputOfBlock(block, 'OPERAND2')
+            };
         case 'operator_mathop': {
-        case 'operator_mathop': {
+            const value = this.descendInputOfBlock(block, 'NUM');
             const operator = block.fields.OPERATOR.value.toLowerCase();
-            switch (operator) {
             switch (operator) {
             case 'abs': return {
                 kind: 'op.abs',
@@ -623,102 +594,102 @@ class ScriptTreeGenerator {
                 kind: 'op.advlog',
                 left: this.descendInputOfBlock(block, 'NUM1'),
                 right: this.descendInputOfBlock(block, 'NUM2')
-        case 'operator_mod':
+            };
         case 'operator_mod':
             return {
                 kind: 'op.mod',
                 left: this.descendInputOfBlock(block, 'NUM1'),
                 right: this.descendInputOfBlock(block, 'NUM2')
-        case 'operator_multiply':
+            };
         case 'operator_multiply':
             return {
                 kind: 'op.multiply',
                 left: this.descendInputOfBlock(block, 'NUM1'),
                 right: this.descendInputOfBlock(block, 'NUM2')
-        case 'operator_not':
+            };
         case 'operator_not':
             return {
                 kind: 'op.not',
                 operand: this.descendInputOfBlock(block, 'OPERAND')
-        case 'operator_or':
+            };
         case 'operator_or':
             return {
                 kind: 'op.or',
                 left: this.descendInputOfBlock(block, 'OPERAND1'),
                 right: this.descendInputOfBlock(block, 'OPERAND2')
+            };
         case 'operator_random': {
             const from = this.descendInputOfBlock(block, 'FROM');
             const to = this.descendInputOfBlock(block, 'TO');
             // If both values are known at compile time, we can do some optimizations.
             // TODO: move optimizations to jsgen?
-            // TODO: move optimizations to jsgen?
             if (from.kind === 'constant' && to.kind === 'constant') {
                 const sFrom = from.value;
+                const sTo = to.value;
                 const nFrom = Cast.toNumber(sFrom);
                 const nTo = Cast.toNumber(sTo);
                 // If both numbers are the same, random is unnecessary.
                 // todo: this probably never happens so consider removing
                 if (nFrom === nTo) {
-                if (nFrom === nTo) {
                     return {
                         kind: 'constant',
                         value: nFrom
+                    };
                 }
                 // If both are ints, hint this to the compiler
-                if (Cast.isInt(sFrom) && Cast.isInt(sTo)) {
                 if (Cast.isInt(sFrom) && Cast.isInt(sTo)) {
                     return {
                         kind: 'op.random',
                         low: nFrom <= nTo ? from : to,
+                        high: nFrom <= nTo ? to : from,
                         useInts: true,
                         useFloats: false
-                        useFloats: false
+                    };
                 }
-                // Otherwise hint that these are floats
                 // Otherwise hint that these are floats
                 return {
                     kind: 'op.random',
                     low: nFrom <= nTo ? from : to,
+                    high: nFrom <= nTo ? to : from,
                     useInts: false,
                     useFloats: true
-                    useFloats: true
                 };
-                // If only one value is known at compile-time, we can still attempt some optimizations.
+            } else if (from.kind === 'constant') {
                 // If only one value is known at compile-time, we can still attempt some optimizations.
                 if (!Cast.isInt(Cast.toNumber(from.value))) {
                     return {
                         kind: 'op.random',
                         low: from,
+                        high: to,
                         useInts: false,
                         useFloats: true
-                        useFloats: true
-                }
+                    };
                 }
             } else if (to.kind === 'constant') {
                 if (!Cast.isInt(Cast.toNumber(to.value))) {
                     return {
                         kind: 'op.random',
                         low: from,
+                        high: to,
                         useInts: false,
                         useFloats: true
-                        useFloats: true
+                    };
                 }
             }
             // No optimizations possible
-            // No optimizations possible
             return {
+                kind: 'op.random',
                 low: from,
                 high: to,
                 useInts: false,
                 useFloats: false
-                useFloats: false
+            };
         }
-        case 'operator_round':
         case 'operator_round':
             return {
                 kind: 'op.round',
                 value: this.descendInputOfBlock(block, 'NUM')
-        case 'operator_subtract':
+            };
         case 'operator_subtract':
             return {
                 kind: 'op.subtract',
@@ -772,20 +743,20 @@ class ScriptTreeGenerator {
                 isOptimized: mutation.optimize === 'true',
                 isNormal: !menuvalues.includes('n') && !menuvalues.includes('N') && !menuvalues.includes('X'),
                 bools, operators
+            };
         }
 
         case 'sensing_answer':
-        case 'sensing_answer':
             return {
                 kind: 'sensing.answer'
-        case 'sensing_coloristouchingcolor':
+            };
         case 'sensing_coloristouchingcolor':
             return {
                 kind: 'sensing.colorTouchingColor',
                 target: this.descendInputOfBlock(block, 'COLOR2'),
                 mask: this.descendInputOfBlock(block, 'COLOR')
+            };
         case 'sensing_current':
-            switch (block.fields.CURRENTMENU.value.toLowerCase()) {
             switch (block.fields.CURRENTMENU.value.toLowerCase()) {
             case 'year':
                 return {
@@ -824,29 +795,29 @@ class ScriptTreeGenerator {
             return {
                 kind: 'constant',
                 value: 0
-        case 'sensing_dayssince2000':
+            };
         case 'sensing_dayssince2000':
             return {
                 kind: 'sensing.daysSince2000'
-        case 'sensing_distanceto':
+            };
         case 'sensing_distanceto':
             return {
                 kind: 'sensing.distance',
                 target: this.descendInputOfBlock(block, 'DISTANCETOMENU')
-        case 'sensing_keypressed':
+            };
         case 'sensing_keypressed':
             return {
                 kind: 'keyboard.pressed',
                 key: this.descendInputOfBlock(block, 'KEY_OPTION')
-        case 'sensing_mousedown':
+            };
         case 'sensing_mousedown':
             return {
                 kind: 'mouse.down'
-        case 'sensing_mousex':
+            };
         case 'sensing_mousex':
             return {
                 kind: 'mouse.x'
-        case 'sensing_mousey':
+            };
         case 'sensing_mousey':
             return {
                 kind: 'mouse.y'
@@ -1056,8 +1027,8 @@ class ScriptTreeGenerator {
                 arguments: args,
                 type: JSON.parse(block.mutation.opType || '"string"')
             };
+        }
 
-        case 'tw_getLastKeyPressed':
         case 'tw_getLastKeyPressed':
             return {
                 kind: 'tw.lastKeyPressed'
@@ -1066,23 +1037,24 @@ class ScriptTreeGenerator {
         case 'control_dualblock':
             return {
                 kind: 'control.dualBlock'
+            };
 
         default: {
             const opcodeFunction = this.runtime.getOpcodeFunction(block.opcode);
             if (opcodeFunction) {
                 // It might be a non-compiled primitive from a standard category
-                // It might be a non-compiled primitive from a standard category
                 if (compatBlocks.outputBlocks.includes(block.opcode)) {
+                    return this.descendCompatLayer(block);
                 }
                 // It might be an extension block.
                 const blockInfo = this.getBlockInfo(block.opcode);
                 if (blockInfo) {
                     const type = blockInfo.info.blockType;
-                    const type = blockInfo.info.blockType;
                     const args = this.descendCompatLayer(block);
                     args.block = block;
+                    if (block.mutation) args.mutation = block.mutation;
                     if (type === BlockType.REPORTER || type === BlockType.BOOLEAN) {
-                    if (type === BlockType.REPORTER || type === BlockType.BOOLEAN) {
+                        return args;
                     }
                 }
             }
@@ -1091,10 +1063,10 @@ class ScriptTreeGenerator {
             const inputs = Object.keys(block.inputs);
             const fields = Object.keys(block.fields);
             if (inputs.length === 0 && fields.length === 1) {
-            if (inputs.length === 0 && fields.length === 1) {
                 return {
                     kind: 'constant',
                     value: block.fields[fields[0]].value
+                };
             }
 
             log.warn(`IR: Unknown input: ${block.opcode}`, block);
@@ -1107,9 +1079,8 @@ class ScriptTreeGenerator {
      * Descend into a stacked block. (eg. "move ( ) steps")
      * @param {*} block The Scratch block to parse.
      * @private
-     * @private
+     * @returns {Node} Compiled node for this block.
      */
-    descendStackedBlock (block) {
     descendStackedBlock (block) {
         // check if we have extension ir for this opcode
         const extensionId = String(block.opcode).split('_')[0];
@@ -1130,10 +1101,10 @@ class ScriptTreeGenerator {
                     // set proper kind
                     irData.kind = extensionId + '.' + blockId;
                     return irData;
+                }
             }
         }
 
-        switch (block.opcode) {
         switch (block.opcode) {
         case 'your_mom':
             return {
@@ -1191,8 +1162,8 @@ class ScriptTreeGenerator {
             return {
                 kind: 'control.continueLoop',
                 id: block.id
+            };
         case 'control_all_at_once':
-            // In Scratch 3, this block behaves like "if 1 = 1"
             // In Scratch 3, this block behaves like "if 1 = 1"
             // WE ARE IN PM NOW IT BEHAVES PROPERLY LESS GO
             return {
@@ -1206,17 +1177,17 @@ class ScriptTreeGenerator {
         case 'control_clear_counter':
             return {
                 kind: 'counter.clear'
-        case 'control_create_clone_of':
+            };
         case 'control_create_clone_of':
             return {
                 kind: 'control.createClone',
                 target: this.descendInputOfBlock(block, 'CLONE_OPTION')
-        case 'control_delete_this_clone':
+            };
         case 'control_delete_this_clone':
             this.script.yields = true;
             return {
                 kind: 'control.deleteClone'
-        case 'control_forever':
+            };
         case 'control_forever':
             this.analyzeLoop();
             return {
@@ -1224,29 +1195,29 @@ class ScriptTreeGenerator {
                 condition: {
                     kind: 'constant',
                     value: true
+                },
                 do: this.descendSubstack(block, 'SUBSTACK')
-                do: this.descendSubstack(block, 'SUBSTACK')
-        case 'control_for_each':
+            };
         case 'control_for_each':
             this.analyzeLoop();
             return {
+                kind: 'control.for',
                 variable: this.descendVariable(block, 'VARIABLE', SCALAR_TYPE),
-                variable: this.descendVariable(block, 'VARIABLE', SCALAR_TYPE),
+                count: this.descendInputOfBlock(block, 'VALUE'),
                 do: this.descendSubstack(block, 'SUBSTACK')
-                do: this.descendSubstack(block, 'SUBSTACK')
-        case 'control_if':
+            };
         case 'control_if':
             return {
                 kind: 'control.if',
-                whenTrue: this.descendSubstack(block, 'SUBSTACK'),
+                condition: this.descendInputOfBlock(block, 'CONDITION'),
                 whenTrue: this.descendSubstack(block, 'SUBSTACK'),
                 whenFalse: []
-        case 'control_if_else':
+            };
         case 'control_if_else':
             return {
                 kind: 'control.if',
+                condition: this.descendInputOfBlock(block, 'CONDITION'),
                 whenTrue: this.descendSubstack(block, 'SUBSTACK'),
-                whenFalse: this.descendSubstack(block, 'SUBSTACK2')
                 whenFalse: this.descendSubstack(block, 'SUBSTACK2')
             };
         case 'control_expandableIf': {
@@ -1302,12 +1273,12 @@ class ScriptTreeGenerator {
             return {
                 kind: 'counter.set',
                 value: this.descendInputOfBlock(block, 'VALUE')
-        case 'control_repeat':
+            };
         case 'control_repeat':
             this.analyzeLoop();
             return {
                 kind: 'control.repeat',
-                do: this.descendSubstack(block, 'SUBSTACK')
+                times: this.descendInputOfBlock(block, 'TIMES'),
                 do: this.descendSubstack(block, 'SUBSTACK')
             };
         case 'control_repeatForSeconds':
@@ -1316,13 +1287,13 @@ class ScriptTreeGenerator {
                 kind: 'control.repeatForSeconds',
                 times: this.descendInputOfBlock(block, 'TIMES'),
                 do: this.descendSubstack(block, 'SUBSTACK')
+            };
         case 'control_repeat_until': {
-        case 'control_repeat_until': {
+            this.analyzeLoop();
             // Dirty hack: automatically enable warp timer for this block if it uses timer
             // This fixes project that do things like "repeat until timer > 0.5"
             this.usesTimer = false;
-            this.usesTimer = false;
-            const needsWarpTimer = this.usesTimer;
+            const condition = this.descendInputOfBlock(block, 'CONDITION');
             const needsWarpTimer = this.usesTimer;
             if (needsWarpTimer) {
                 this.script.yields = true;
@@ -1330,33 +1301,33 @@ class ScriptTreeGenerator {
             return {
                 kind: 'control.while',
                 condition: {
+                    kind: 'op.not',
                     operand: condition
-                    operand: condition
+                },
                 do: this.descendSubstack(block, 'SUBSTACK'),
                 warpTimer: needsWarpTimer
-                warpTimer: needsWarpTimer
+            };
         }
         case 'control_stop': {
             const level = block.fields.STOP_OPTION.value;
             if (level === 'all') {
-            if (level === 'all') {
                 this.script.yields = true;
                 return {
                     kind: 'control.stopAll'
-            } else if (level === 'other scripts in sprite' || level === 'other scripts in stage') {
+                };
             } else if (level === 'other scripts in sprite' || level === 'other scripts in stage') {
                 return {
                     kind: 'control.stopOthers'
-            } else if (level === 'this script') {
+                };
             } else if (level === 'this script') {
                 return {
                     kind: 'control.stopScript'
-            }
+                };
             }
             return {
                 kind: 'noop'
+            };
         }
-        case 'control_wait':
         case 'control_wait':
             this.script.yields = true;
             return {
@@ -1367,7 +1338,7 @@ class ScriptTreeGenerator {
             this.script.yields = true;
             return {
                 kind: 'control.waitTick'
-        case 'control_wait_until':
+            };
         case 'control_wait_until':
             this.script.yields = true;
             return {
@@ -1380,14 +1351,14 @@ class ScriptTreeGenerator {
                 kind: 'control.waitOrUntil',
                 seconds: this.descendInputOfBlock(block, 'DURATION'),
                 condition: this.descendInputOfBlock(block, 'CONDITION')
-        case 'control_while':
+            };
         case 'control_while':
             this.analyzeLoop();
             return {
                 kind: 'control.while',
+                condition: this.descendInputOfBlock(block, 'CONDITION'),
                 do: this.descendSubstack(block, 'SUBSTACK'),
                 // We should consider analyzing this like we do for control_repeat_until
-                warpTimer: false
                 warpTimer: false
             };
         case 'control_run_as_sprite':
@@ -1400,17 +1371,17 @@ class ScriptTreeGenerator {
             return {
                 kind: 'control.newScript',
                 substack: this.descendSubstack(block, 'SUBSTACK')
-        case 'data_addtolist':
+            };
         case 'data_addtolist':
             return {
-                list: this.descendVariable(block, 'LIST', LIST_TYPE),
+                kind: 'list.add',
                 list: this.descendVariable(block, 'LIST', LIST_TYPE),
                 item: this.descendInputOfBlock(block, 'ITEM')
+            };
         case 'data_changevariableby': {
             const variable = this.descendVariable(block, 'VARIABLE', SCALAR_TYPE);
-            const variable = this.descendVariable(block, 'VARIABLE', SCALAR_TYPE);
             return {
-                variable,
+                kind: 'var.set',
                 variable,
                 value: {
                     kind: 'op.add',
@@ -1420,11 +1391,11 @@ class ScriptTreeGenerator {
                     },
                     right: this.descendInputOfBlock(block, 'VALUE')
                 }
+            };
         }
         case 'data_deletealloflist':
-        case 'data_deletealloflist':
             return {
-                list: this.descendVariable(block, 'LIST', LIST_TYPE)
+                kind: 'list.deleteAll',
                 list: this.descendVariable(block, 'LIST', LIST_TYPE)
             };
         case 'data_listforeachnum':
@@ -1444,18 +1415,18 @@ class ScriptTreeGenerator {
                 list: this.descendVariable(block, 'LIST', LIST_TYPE),
                 variable: this.descendVariable(block, 'VARIABLE', SCALAR_TYPE),
                 do: this.descendSubstack(block, 'SUBSTACK')
+            };
         case 'data_deleteoflist': {
-            const index = this.descendInputOfBlock(block, 'INDEX');
             const index = this.descendInputOfBlock(block, 'INDEX');
             if (index.kind === 'constant' && index.value === 'all') {
                 return {
+                    kind: 'list.deleteAll',
                     list: this.descendVariable(block, 'LIST', LIST_TYPE)
-                    list: this.descendVariable(block, 'LIST', LIST_TYPE)
-            }
+                };
             }
             return {
+                kind: 'list.delete',
                 list: this.descendVariable(block, 'LIST', LIST_TYPE),
-                index: index
                 index: index
             };
         }
@@ -1464,46 +1435,46 @@ class ScriptTreeGenerator {
                 kind: 'list.shift',
                 list: this.descendVariable(block, 'LIST', LIST_TYPE),
                 index: this.descendInputOfBlock(block, 'INDEX')
+            };
         }
         case 'data_hidelist':
-        case 'data_hidelist':
             return {
+                kind: 'list.hide',
                 list: this.descendVariable(block, 'LIST', LIST_TYPE)
-                list: this.descendVariable(block, 'LIST', LIST_TYPE)
-        case 'data_hidevariable':
+            };
         case 'data_hidevariable':
             return {
+                kind: 'var.hide',
                 variable: this.descendVariable(block, 'VARIABLE', SCALAR_TYPE)
-                variable: this.descendVariable(block, 'VARIABLE', SCALAR_TYPE)
-        case 'data_insertatlist':
+            };
         case 'data_insertatlist':
             return {
+                kind: 'list.insert',
                 list: this.descendVariable(block, 'LIST', LIST_TYPE),
                 index: this.descendInputOfBlock(block, 'INDEX'),
-                index: this.descendInputOfBlock(block, 'INDEX'),
                 item: this.descendInputOfBlock(block, 'ITEM')
-        case 'data_replaceitemoflist':
+            };
         case 'data_replaceitemoflist':
             return {
+                kind: 'list.replace',
                 list: this.descendVariable(block, 'LIST', LIST_TYPE),
                 index: this.descendInputOfBlock(block, 'INDEX'),
-                index: this.descendInputOfBlock(block, 'INDEX'),
                 item: this.descendInputOfBlock(block, 'ITEM')
-        case 'data_setvariableto':
+            };
         case 'data_setvariableto':
             return {
-                variable: this.descendVariable(block, 'VARIABLE', SCALAR_TYPE),
+                kind: 'var.set',
                 variable: this.descendVariable(block, 'VARIABLE', SCALAR_TYPE),
                 value: this.descendInputOfBlock(block, 'VALUE')
-        case 'data_showlist':
+            };
         case 'data_showlist':
             return {
+                kind: 'list.show',
                 list: this.descendVariable(block, 'LIST', LIST_TYPE)
-                list: this.descendVariable(block, 'LIST', LIST_TYPE)
-        case 'data_showvariable':
+            };
         case 'data_showvariable':
             return {
-                variable: this.descendVariable(block, 'VARIABLE', SCALAR_TYPE)
+                kind: 'var.show',
                 variable: this.descendVariable(block, 'VARIABLE', SCALAR_TYPE)
             };
         case 'data_filterlist':
@@ -1511,41 +1482,41 @@ class ScriptTreeGenerator {
                 kind: 'list.filter',
                 list: this.descendVariable(block, 'LIST', LIST_TYPE),
                 bool: this.descendInputOfBlock(block, 'BOOL')
+            };
 
-        case 'event_broadcast':
         case 'event_broadcast':
             return {
                 kind: 'event.broadcast',
                 broadcast: this.descendInputOfBlock(block, 'BROADCAST_INPUT')
-        case 'event_broadcastandwait':
+            };
         case 'event_broadcastandwait':
             this.script.yields = true;
             return {
                 kind: 'event.broadcastAndWait',
                 broadcast: this.descendInputOfBlock(block, 'BROADCAST_INPUT')
+            };
 
         case 'looks_changeeffectby':
-        case 'looks_changeeffectby':
             return {
-                effect: block.fields.EFFECT.value.toLowerCase(),
+                kind: 'looks.changeEffect',
                 effect: block.fields.EFFECT.value.toLowerCase(),
                 value: this.descendInputOfBlock(block, 'CHANGE')
-        case 'looks_changesizeby':
+            };
         case 'looks_changesizeby':
             return {
                 kind: 'looks.changeSize',
                 size: this.descendInputOfBlock(block, 'CHANGE')
-        case 'looks_cleargraphiceffects':
+            };
         case 'looks_cleargraphiceffects':
             return {
                 kind: 'looks.clearEffects'
+            };
         case 'looks_goforwardbackwardlayers':
-            if (block.fields.FORWARD_BACKWARD.value === 'forward') {
             if (block.fields.FORWARD_BACKWARD.value === 'forward') {
                 return {
                     kind: 'looks.forwardLayers',
                     layers: this.descendInputOfBlock(block, 'NUM')
-            }
+                };
             }
             return {
                 kind: 'looks.backwardLayers',
@@ -1561,34 +1532,34 @@ class ScriptTreeGenerator {
             return {
                 kind: 'looks.targetBack',
                 layers: this.descendInputOfBlock(block, 'VISIBLE_OPTION')
+            };
         case 'looks_gotofrontback':
-            if (block.fields.FRONT_BACK.value === 'front') {
             if (block.fields.FRONT_BACK.value === 'front') {
                 return {
                     kind: 'looks.goToFront'
-            }
+                };
             }
             return {
                 kind: 'looks.goToBack'
-        case 'looks_hide':
+            };
         case 'looks_hide':
             return {
                 kind: 'looks.hide'
-        case 'looks_nextbackdrop':
+            };
         case 'looks_nextbackdrop':
             return {
                 kind: 'looks.nextBackdrop'
-        case 'looks_nextcostume':
+            };
         case 'looks_nextcostume':
             return {
                 kind: 'looks.nextCostume'
-        case 'looks_seteffectto':
+            };
         case 'looks_seteffectto':
             return {
-                effect: block.fields.EFFECT.value.toLowerCase(),
+                kind: 'looks.setEffect',
                 effect: block.fields.EFFECT.value.toLowerCase(),
                 value: this.descendInputOfBlock(block, 'VALUE')
-        case 'looks_setsizeto':
+            };
         case 'looks_setsizeto':
             return {
                 kind: 'looks.setSize',
@@ -1616,67 +1587,67 @@ class ScriptTreeGenerator {
                 kind: 'looks.setShape',
                 prop: block.fields.prop.value,
                 value: this.descendInputOfBlock(block, 'color')
-        case 'looks_show':
+            };
         case 'looks_show':
             return {
                 kind: 'looks.show'
-        case 'looks_switchbackdropto':
+            };
         case 'looks_switchbackdropto':
             return {
                 kind: 'looks.switchBackdrop',
                 backdrop: this.descendInputOfBlock(block, 'BACKDROP')
-        case 'looks_switchcostumeto':
+            };
         case 'looks_switchcostumeto':
             return {
                 kind: 'looks.switchCostume',
                 costume: this.descendInputOfBlock(block, 'COSTUME')
+            };
 
-        case 'motion_changexby':
         case 'motion_changexby':
             return {
                 kind: 'motion.changeX',
                 dx: this.descendInputOfBlock(block, 'DX')
-        case 'motion_changeyby':
+            };
         case 'motion_changeyby':
             return {
                 kind: 'motion.changeY',
                 dy: this.descendInputOfBlock(block, 'DY')
-        case 'motion_gotoxy':
+            };
         case 'motion_gotoxy':
             return {
                 kind: 'motion.setXY',
                 x: this.descendInputOfBlock(block, 'X'),
                 y: this.descendInputOfBlock(block, 'Y')
-        case 'motion_ifonedgebounce':
+            };
         case 'motion_ifonedgebounce':
             return {
                 kind: 'motion.ifOnEdgeBounce'
-        case 'motion_movesteps':
+            };
         case 'motion_movesteps':
             return {
                 kind: 'motion.step',
                 steps: this.descendInputOfBlock(block, 'STEPS')
-        case 'motion_pointindirection':
+            };
         case 'motion_pointindirection':
             return {
                 kind: 'motion.setDirection',
                 direction: this.descendInputOfBlock(block, 'DIRECTION')
-        case 'motion_setrotationstyle':
+            };
         case 'motion_setrotationstyle':
             return {
+                kind: 'motion.setRotationStyle',
                 style: block.fields.STYLE.value
-                style: block.fields.STYLE.value
-        case 'motion_setx':
+            };
         case 'motion_setx':
             return {
                 kind: 'motion.setX',
                 x: this.descendInputOfBlock(block, 'X')
-        case 'motion_sety':
+            };
         case 'motion_sety':
             return {
                 kind: 'motion.setY',
                 y: this.descendInputOfBlock(block, 'Y')
-        case 'motion_turnleft':
+            };
         case 'motion_turnleft':
             return {
                 kind: 'motion.setDirection',
@@ -1687,7 +1658,7 @@ class ScriptTreeGenerator {
                     },
                     right: this.descendInputOfBlock(block, 'DEGREES')
                 }
-        case 'motion_turnright':
+            };
         case 'motion_turnright':
             return {
                 kind: 'motion.setDirection',
@@ -1698,67 +1669,67 @@ class ScriptTreeGenerator {
                     },
                     right: this.descendInputOfBlock(block, 'DEGREES')
                 }
+            };
 
-        case 'pen_clear':
         case 'pen_clear':
             return {
                 kind: 'pen.clear'
-        case 'pen_changePenColorParamBy':
+            };
         case 'pen_changePenColorParamBy':
             return {
                 kind: 'pen.changeParam',
                 param: this.descendInputOfBlock(block, 'COLOR_PARAM'),
                 value: this.descendInputOfBlock(block, 'VALUE')
-        case 'pen_changePenHueBy':
+            };
         case 'pen_changePenHueBy':
             return {
                 kind: 'pen.legacyChangeHue',
                 hue: this.descendInputOfBlock(block, 'HUE')
-        case 'pen_changePenShadeBy':
+            };
         case 'pen_changePenShadeBy':
             return {
                 kind: 'pen.legacyChangeShade',
                 shade: this.descendInputOfBlock(block, 'SHADE')
-        case 'pen_penDown':
+            };
         case 'pen_penDown':
             return {
                 kind: 'pen.down'
-        case 'pen_penUp':
+            };
         case 'pen_penUp':
             return {
                 kind: 'pen.up'
-        case 'pen_setPenColorParamTo':
+            };
         case 'pen_setPenColorParamTo':
             return {
                 kind: 'pen.setParam',
                 param: this.descendInputOfBlock(block, 'COLOR_PARAM'),
                 value: this.descendInputOfBlock(block, 'VALUE')
-        case 'pen_setPenColorToColor':
+            };
         case 'pen_setPenColorToColor':
             return {
+                kind: 'pen.setColor',
                 color: this.descendInputOfBlock(block, 'COLOR')
-                color: this.descendInputOfBlock(block, 'COLOR')
-        case 'pen_setPenHueToNumber':
+            };
         case 'pen_setPenHueToNumber':
             return {
                 kind: 'pen.legacySetHue',
                 hue: this.descendInputOfBlock(block, 'HUE')
-        case 'pen_setPenShadeToNumber':
+            };
         case 'pen_setPenShadeToNumber':
             return {
                 kind: 'pen.legacySetShade',
                 shade: this.descendInputOfBlock(block, 'SHADE')
-        case 'pen_setPenSizeTo':
+            };
         case 'pen_setPenSizeTo':
             return {
                 kind: 'pen.setSize',
                 size: this.descendInputOfBlock(block, 'SIZE')
-        case 'pen_changePenSizeBy':
+            };
         case 'pen_changePenSizeBy':
             return {
                 kind: 'pen.changeSize',
                 size: this.descendInputOfBlock(block, 'SIZE')
-        case 'pen_stamp':
+            };
         case 'pen_stamp':
             return {
                 kind: 'pen.stamp'
@@ -1800,9 +1771,9 @@ class ScriptTreeGenerator {
                 return {
                     kind: 'noop'
                 };
+            }
 
-
-
+            const [paramNames, paramIds, paramDefaults] = paramNamesIdsAndDefaults;
 
             const addonBlock = this.runtime.getAddonBlock(procedureCode);
             if (addonBlock) {
@@ -1821,12 +1792,12 @@ class ScriptTreeGenerator {
                     args[paramNames[i]] = value;
                 }
                 return {
+                    kind: 'addons.call',
                     code: procedureCode,
                     arguments: args,
                     blockId: block.id
-                    blockId: block.id
                 };
-
+            }
 
             const definitionId = this.blocks.getProcedureDefinition(procedureCode);
             const definitionBlock = this.blocks.getBlock(definitionId);
@@ -1835,7 +1806,7 @@ class ScriptTreeGenerator {
                     kind: 'noop'
                 };
             }
-
+            const innerDefinition = this.blocks.getBlock(definitionBlock.inputs.custom_block.block);
 
             let isWarp = this.script.isWarp;
             if (!isWarp) {
@@ -1847,9 +1818,9 @@ class ScriptTreeGenerator {
                         isWarp = JSON.parse(warp);
                     }
                 }
+            }
 
-
-
+            const variant = generateProcedureVariant(procedureCode, isWarp);
 
             if (!this.script.dependedProcedures.includes(variant)) {
                 this.script.dependedProcedures.push(variant);
@@ -1860,7 +1831,7 @@ class ScriptTreeGenerator {
                 if (procedureCode === this.script.procedureCode) {
                     this.script.yields = true;
                 }
-
+            }
 
             const args = [];
             for (let i = 0; i < paramIds.length; i++) {
@@ -1878,11 +1849,11 @@ class ScriptTreeGenerator {
                     };
                 }
                 args.push(value);
-
+            }
 
             return {
+                kind: 'procedures.call',
                 code: procedureCode,
-                variant,
                 variant,
                 returns: false,
                 arguments: args,
@@ -2215,6 +2186,7 @@ class ScriptTreeGenerator {
         }
 
         return result;
+    }
 
     /**
      * Descend into a variable.
@@ -2228,44 +2200,44 @@ class ScriptTreeGenerator {
         const variable = block.fields[fieldName];
         const id = variable.id;
 
-
+        if (this.variableCache.hasOwnProperty(id)) {
             return this.variableCache[id];
         }
 
         const data = this._descendVariable(id, variable.value, type);
-        const data = this._descendVariable(id, variable.value, type);
+        this.variableCache[id] = data;
         return data;
     }
 
     /**
-    /**
+     * @param {string} id The ID of the variable.
      * @param {string} name The name of the variable.
      * @param {''|'list'} type The variable type.
      * @private
-     * @private
+     * @returns {*} A parsed variable object.
      */
     _descendVariable (id, name, type) {
         const target = this.target;
         const stage = this.stage;
 
         // Look for by ID in target...
-        // Look for by ID in target...
         if (target.variables.hasOwnProperty(id)) {
+            return createVariableData('target', target.variables[id]);
         }
 
         // Look for by ID in stage...
         if (!target.isStage) {
-        if (!target.isStage) {
             if (stage && stage.variables.hasOwnProperty(id)) {
+                return createVariableData('stage', stage.variables[id]);
             }
         }
 
         // Look for by name and type in target...
         for (const varId in target.variables) {
-        for (const varId in target.variables) {
+            if (target.variables.hasOwnProperty(varId)) {
                 const currVar = target.variables[varId];
                 if (currVar.name === name && currVar.type === type) {
-                if (currVar.name === name && currVar.type === type) {
+                    return createVariableData('target', currVar);
                 }
             }
         }
@@ -2273,24 +2245,23 @@ class ScriptTreeGenerator {
         // Look for by name and type in stage...
         if (!target.isStage && stage) {
             for (const varId in stage.variables) {
-            for (const varId in stage.variables) {
+                if (stage.variables.hasOwnProperty(varId)) {
                     const currVar = stage.variables[varId];
                     if (currVar.name === name && currVar.type === type) {
-                    if (currVar.name === name && currVar.type === type) {
+                        return createVariableData('stage', currVar);
                     }
                 }
             }
         }
 
         // Create it locally...
-        // Create it locally...
         const newVariable = this.runtime.newVariableInstance(type, id, name, false);
+        target.variables[id] = newVariable;
 
         if (target.sprite) {
             // Create the variable in all instances of this sprite.
             // This is necessary because the script cache is shared between clones.
             // sprite.clones has all instances of this sprite including the original and all clones
-            for (const clone of target.sprite.clones) {
             for (const clone of target.sprite.clones) {
                 if (!clone.variables.hasOwnProperty(id)) {
                     clone.variables[id] = this.runtime.newVariableInstance(type, id, name, false);
@@ -2304,7 +2275,7 @@ class ScriptTreeGenerator {
     /**
      * Descend into a block that uses the compatibility layer.
      * @param {Block} block The block to use the compatibility layer for.
-     * @private
+     * @param {*} blockInfo An extensions block info text
      * @private
      * @returns {Node} The parsed node.
      */
@@ -2314,18 +2285,18 @@ class ScriptTreeGenerator {
             blockInfo = this.getBlockInfo(block.opcode);
             blockInfo = blockInfo ? blockInfo.info : null;
         }
+        
         const inputs = {};
         for (const name of Object.keys(block.inputs)) {
             if (!name.startsWith('SUBSTACK')) {
-            if (!name.startsWith('SUBSTACK')) {
                 inputs[name] = this.descendInputOfBlock(block, name);
+                if (blockInfo && blockInfo.arguments[name]) inputs[name].compilerInfo = ScriptTreeGenerator.addCompilerInfo(inputs[name], blockInfo.arguments[name].compilerInfo)
             }
         }
 
         const fields = {};
-        const fields = {};
         const substacks = [];
-        if (blockType === BlockType.CONDITIONAL || blockType === BlockType.LOOP) {
+        const blockType = (blockInfo && blockInfo.blockType) || BlockType.COMMAND;
         if (blockType === BlockType.CONDITIONAL || blockType === BlockType.LOOP) {
             for (let i in (blockInfo.branches || [])) {
                 const inputName = i === "0" ? 'SUBSTACK' : `SUBSTACK${Number(i) + 1}`;
@@ -2342,20 +2313,21 @@ class ScriptTreeGenerator {
             fields[name] = block.fields[name].value;
         }
         return {
+            kind: 'compat',
             id: block.id,
-            id: block.id,
+            opcode: block.opcode,
             blockType,
             inputs,
             fields,
-            fields,
             substacks,
             compilerInfo: (blockInfo && blockInfo.compilerInfo) || {}
+        };
     }
 
     analyzeLoop () {
-    analyzeLoop () {
         if (!this.script.isWarp || this.script.warpTimer) {
             this.script.yields = true;
+        }
     }
 
     readTopBlockComment (commentId) {
@@ -2388,12 +2360,12 @@ class ScriptTreeGenerator {
             break;
         }
     }
-    }
-    /**
+    
     /**
      * @param {Block} hatBlock The block to start at
+     * @returns {Node[]} An array of generated nodes
      */
-     */
+    walkHat(hatBlock) {
         const nextBlock = hatBlock.next;
         const opcode = hatBlock.opcode;
         const hatInfo = this.runtime._hats[opcode];
@@ -2403,10 +2375,10 @@ class ScriptTreeGenerator {
             // interpreter parity, but the reuslt is ignored.
             const opcodeFunction = this.runtime.getOpcodeFunction(opcode);
             if (opcodeFunction) {
-            if (opcodeFunction) {
                 return [
                     this.descendCompatLayer(hatBlock),
                     ...this.walkStack(nextBlock)
+                ];
             }
             return this.walkStack(nextBlock);
         }
@@ -2415,14 +2387,14 @@ class ScriptTreeGenerator {
             // Edge-activated HAT
             this.script.yields = true;
             this.script.executableHat = true;
-            this.script.executableHat = true;
             return [
                 {
-                    id: hatBlock.id,
+                    kind: 'hat.edge',
                     id: hatBlock.id,
                     condition: this.descendCompatLayer(hatBlock)
                 },
                 ...this.walkStack(nextBlock)
+            ];
         }
 
         const opcodeFunction = this.runtime.getOpcodeFunction(opcode);
@@ -2430,13 +2402,13 @@ class ScriptTreeGenerator {
             // Predicate-based HAT
             this.script.yields = true;
             this.script.executableHat = true;
-            this.script.executableHat = true;
             return [
                 {
                     kind: 'hat.predicate',
                     condition: this.descendCompatLayer(hatBlock)
                 },
                 ...this.walkStack(nextBlock)
+            ];
         }
 
         return this.walkStack(nextBlock);
@@ -2444,7 +2416,7 @@ class ScriptTreeGenerator {
 
     /**
      * @param {string} topBlockId The ID of the top block of the script.
-     * @param {string} topBlockId The ID of the top block of the script.
+     * @returns {IntermediateScript} The generated ir script for this hats blocks
      */
     generate (topBlockId) {
         this.blocks.populateProcedureCache();
@@ -2473,10 +2445,10 @@ class ScriptTreeGenerator {
             // We don't evaluate the procedures_definition top block as it never does anything
             // We also don't want it to be treated like a hat block
             let entryBlock;
-            let entryBlock;
             if (
                 topBlock.opcode === 'procedures_definition'
                 || topBlock.opcode === 'procedures_definition_return'
+            ) {
                 entryBlock = topBlock.next;
             } else {
                 entryBlock = topBlockId;
@@ -2486,10 +2458,10 @@ class ScriptTreeGenerator {
                 this.script.stack = this.walkStack(entryBlock);
             }
         }
-        }
 
         if (this.debug) {
             log.info(`IR: ${this.target.getName()}: compiled ${this.script.procedureCode || 'script'}`, this.script.stack);
+        }
 
         return this.script;
     }
@@ -2507,7 +2479,6 @@ class IRGenerator {
 
         this.analyzedProcedures = [];
     }
-    }
 
     static _extensionIRInfo = {};
     static setExtensionIr(id, data) {
@@ -2518,10 +2489,11 @@ class IRGenerator {
     }
     static getExtensionIr(id) {
         return IRGenerator._extensionIRInfo[id];
+    }
 
     addProcedureDependencies (dependencies) {
         for (const procedureVariant of dependencies) {
-        for (const procedureVariant of dependencies) {
+            if (this.procedures.hasOwnProperty(procedureVariant)) {
                 continue;
             }
             if (this.compilingProcedures.has(procedureVariant)) {
@@ -2550,7 +2522,7 @@ class IRGenerator {
     /**
      * Recursively analyze a script and its dependencies.
      * @param {IntermediateScript} script Intermediate script.
-     * @param {IntermediateScript} script Intermediate script.
+     * @returns {boolean} If changes have been made to the script
      */
     analyzeScript (script) {
         let madeChanges = false;
@@ -2608,7 +2580,6 @@ class IRGenerator {
         // Analyze scripts until no changes are made.
         while (this.analyzeScript(entry));
 
-
         const ir = new IntermediateRepresentation();
         ir.entry = entry;
         ir.procedures = this.procedures;
@@ -2620,3 +2591,4 @@ class IRGenerator {
     }
 }
 
+module.exports = IRGenerator;
