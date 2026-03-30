@@ -10,6 +10,8 @@
 const stacked = [
     'looks_changestretchby',
     'looks_hideallsprites',
+    'looks_say', 
+    'looks_think', 
     'looks_sayforsecs',
     'looks_setstretchto',
     'looks_switchbackdroptoandwait',
