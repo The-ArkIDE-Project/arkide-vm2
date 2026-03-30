@@ -44,6 +44,6 @@ const inputs = [
 ];
 
 module.exports = {
-    stacked,
-    inputs
+    statementBlocks: stacked,
+    outputBlocks: inputs
 };
