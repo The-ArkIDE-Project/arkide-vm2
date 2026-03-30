@@ -643,7 +643,7 @@ class IROptimizer {
      * @private
      */
     analyzeStack (stack, state) {
-        if (!stack) return false;
+        if (!stack || !stack.blocks) return false;
         let modified = false;
         for (const stackBlock of stack.blocks) {
             let stateChanged = this.analyzeStackBlock(stackBlock, state);
@@ -773,7 +773,7 @@ class IROptimizer {
      * @private
      */
     optimizeStack (stack, state) {
-        if (!stack) return;
+        if (!stack || !stack.blocks) return;
         for (const stackBlock of stack.blocks) {
             if (stackBlock.entryState) state = stackBlock.entryState;
             for (const inputKey in stackBlock.inputs) {

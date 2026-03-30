@@ -2157,7 +2157,7 @@ class ScriptTreeGenerator {
     descendSubstack (parentBlock, substackName) {
         const input = parentBlock.inputs[substackName];
         if (!input) {
-            return [];
+            return new IntermediateStack(); 
         }
         const stackId = input.block;
         return this.walkStack(stackId);
@@ -2170,22 +2170,15 @@ class ScriptTreeGenerator {
      * @returns {Node[]} List of stacked block nodes.
      */
     walkStack (startingBlockId) {
-        const result = [];
+        const blocks = [];
         let blockId = startingBlockId;
-
         while (blockId !== null) {
             const block = this.getBlockById(blockId);
-            if (!block) {
-                break;
-            }
-
-            const node = this.descendStackedBlock(block);
-            result.push(node);
-
+            if (!block) break;
+            blocks.push(this.descendStackedBlock(block));
             blockId = block.next;
         }
-
-        return result;
+        return new IntermediateStack(blocks);
     }
 
     /**
