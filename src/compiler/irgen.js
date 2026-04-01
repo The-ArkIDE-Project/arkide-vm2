@@ -1071,8 +1071,10 @@ class ScriptTreeGenerator {
                 };
             }
 
-            log.warn(`IR: Unknown input: ${block.opcode}`, block);
-            throw new Error(`IR: Unknown input: ${block.opcode}`);
+            // Last-resort fallback: compile through compatibility layer.
+            // This lets newly added blocks run even before explicit compiler support is added.
+            log.warn(`IR: Unknown input (using compat fallback): ${block.opcode}`, block);
+            return this.descendCompatLayer(block);
         }
         }
     }
@@ -2145,8 +2147,10 @@ class ScriptTreeGenerator {
                 }
             }
 
-            log.warn(`IR: Unknown stacked block: ${block.opcode}`, block);
-            throw new Error(`IR: Unknown stacked block: ${block.opcode}`);
+            // Last-resort fallback: compile through compatibility layer.
+            // This lets newly added blocks run even before explicit compiler support is added.
+            log.warn(`IR: Unknown stacked block (using compat fallback): ${block.opcode}`, block);
+            return this.descendCompatLayer(block);
         }
         }
     }

@@ -155,6 +155,10 @@ const executeInCompatibilityLayer = function*(inputs, blockFunction, isWarp, use
     };
 
     const executeBlock = () => {
+        if (typeof blockFunction !== 'function') {
+            globalState.log.warn('Missing opcode function in compatibility layer for block:', blockId);
+            return '';
+        }
         blockUtility.init(thread, blockId, stackFrame);
         return blockFunction(inputs, blockUtility);
     };
