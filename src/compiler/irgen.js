@@ -1057,6 +1057,8 @@ class ScriptTreeGenerator {
                         return args;
                     }
                 }
+                // Fallback: any block with a registered opcodeFunction can run via compat layer
+                return this.descendCompatLayer(block);
             }
 
             // It might be a menu.
@@ -2125,6 +2127,8 @@ class ScriptTreeGenerator {
                         return args;
                     }
                 }
+                // Fallback: any block with a registered opcodeFunction can run via compat layer
+                return this.descendCompatLayer(block);
             }
 
             // When this thread was triggered by a stack click, attempt to compile as an input.
